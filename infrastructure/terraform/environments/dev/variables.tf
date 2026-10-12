@@ -33,3 +33,8 @@ variable "availability_zone" {
   type        = string
   default     = "eu-north-1a"
 }
+
+variable "admin_cidr" {
+  description = "Your current public IPv4 address in /32 notation."
+  type        = string
+}

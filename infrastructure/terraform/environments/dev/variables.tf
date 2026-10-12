@@ -38,3 +38,9 @@ variable "admin_cidr" {
   description = "Your current public IPv4 address in /32 notation."
   type        = string
 }
+
+variable "ssh_public_key_path" {
+  description = "Path to the administrator's SSH public key."
+  type        = string
+  default     = "~/.ssh/cloud-reliability/id_ed25519.pub"
+}

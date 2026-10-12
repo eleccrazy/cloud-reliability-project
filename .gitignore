@@ -1,0 +1,31 @@
+# Local credentials and tooling state
+.aws/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go build and test artifacts
+app/bin/
+bin/
+*.test
+coverage.out
+
+# Terraform local state, plans, and private variable values
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
+# Ansible temporary files
+*.retry
+
+# Editor and operating system files
+.DS_Store
+*.swp
+*.swo

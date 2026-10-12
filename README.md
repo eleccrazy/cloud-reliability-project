@@ -32,5 +32,3 @@ implementation files are created when they have meaningful contents. Generate
 The root Makefile reserves `build`, `test`, `infra-plan`, `infra-apply`,
 `configure`, `verify`, and `destroy`. These commands currently report that their
 implementation is pending and exit with an error.
-
-A license has not yet been selected.

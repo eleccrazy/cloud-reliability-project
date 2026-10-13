@@ -1,0 +1,77 @@
+---
+- name: Validate supported Node Exporter architecture
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["architecture"] == "x86_64"
+      - ansible_facts["system"] == "Linux"
+    fail_msg: "This role currently supports Linux x86_64 only."
+
+- name: Create Node Exporter system group
+  ansible.builtin.group:
+    name: node_exporter
+    system: true
+    state: present
+
+- name: Create Node Exporter service account
+  ansible.builtin.user:
+    name: node_exporter
+    group: node_exporter
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present
+
+- name: Download verified Node Exporter release
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_download_url }}"
+    dest: "/tmp/{{ node_exporter_archive }}"
+    checksum: "sha256:{{ node_exporter_sha256 }}"
+    mode: "0644"
+
+- name: Extract Node Exporter release
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ node_exporter_archive }}"
+    dest: /opt
+    remote_src: true
+    creates: "{{ node_exporter_install_dir }}/node_exporter"
+
+- name: Install Node Exporter binary
+  ansible.builtin.copy:
+    src: "{{ node_exporter_install_dir }}/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart Node Exporter
+
+- name: Install Node Exporter systemd unit
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Node Exporter
+
+- name: Enable and start Node Exporter
+  ansible.builtin.systemd_service:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply pending Node Exporter restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Node Exporter metrics endpoint
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9100/metrics
+    method: GET
+    status_code: 200
+    return_content: false
+  register: node_exporter_health
+  retries: 5
+  delay: 2
+  until: node_exporter_health.status == 200
+  changed_when: false

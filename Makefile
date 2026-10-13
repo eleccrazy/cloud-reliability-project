@@ -2,19 +2,30 @@ TF_DIR := infrastructure/terraform/environments/dev
 ANSIBLE_DIR := ansible
 PYTHON := .venv/bin/python
 
-.PHONY: infra-plan infra-apply ssh-bootstrap ping destroy
+.DEFAULT_GOAL := help
 
-infra-plan:
+.PHONY: help bootstrap infra-plan infra-apply ssh-bootstrap ping destroy
+
+help: ## Show available commands and what they do
+	@printf 'Usage: make <command>\n\nCommands:\n'
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+bootstrap: ## Apply dev infrastructure, verify SSH host keys, and check Ansible connectivity
+	$(MAKE) infra-apply
+	$(MAKE) ssh-bootstrap
+	$(MAKE) ping
+
+infra-plan: ## Preview changes to the dev infrastructure with Terraform
 	cd $(TF_DIR) && terraform plan
 
-infra-apply:
+infra-apply: ## Create or update the dev infrastructure with Terraform
 	cd $(TF_DIR) && terraform apply
 
-ssh-bootstrap:
+ssh-bootstrap: ## Verify EC2 SSH host keys against AWS and save them to known_hosts
 	$(PYTHON) scripts/sync-ssh-hostkeys.py
 
-ping:
+ping: ## Check SSH access and Python availability on all Ansible inventory hosts
 	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible all -m ansible.builtin.ping
 
-destroy:
+destroy: ## Destroy all resources managed by the dev Terraform configuration
 	cd $(TF_DIR) && terraform destroy

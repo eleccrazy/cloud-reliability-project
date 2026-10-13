@@ -1,0 +1,20 @@
+---
+prometheus_version: "3.13.4"
+prometheus_arch: "linux-amd64"
+
+prometheus_sha256: "87f21a66f96c597a189cef8d640e8921b621fc17a9feff707c332c4f3b3ddd56"
+
+prometheus_archive: "prometheus-{{ prometheus_version }}.{{ prometheus_arch }}.tar.gz"
+
+prometheus_download_url: >-
+  https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/{{ prometheus_archive }}
+
+prometheus_install_dir: "/opt/prometheus-{{ prometheus_version }}.{{ prometheus_arch }}"
+
+prometheus_config_dir: /etc/prometheus
+prometheus_data_dir: /var/lib/prometheus
+
+prometheus_listen_address: "0.0.0.0:9090"
+prometheus_scrape_interval: 30s
+prometheus_retention_time: 3d
+prometheus_retention_size: 1GB

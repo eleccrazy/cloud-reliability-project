@@ -7,3 +7,11 @@
   roles:
     - common
     - node_exporter
+
+- name: Configure Prometheus server
+  hosts: role_prometheus
+  become: true
+  gather_facts: true
+
+  roles:
+    - prometheus

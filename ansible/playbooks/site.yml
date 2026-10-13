@@ -15,3 +15,11 @@
 
   roles:
     - prometheus
+
+- name: Configure Grafana server
+  hosts: role_grafana
+  become: true
+  gather_facts: true
+
+  roles:
+    - grafana

@@ -1,0 +1,11 @@
+---
+grafana_package: grafana
+
+grafana_http_port: 3000
+grafana_http_addr: "0.0.0.0"
+
+grafana_provisioning_dir: /etc/grafana/provisioning
+grafana_dashboards_dir: /var/lib/grafana/dashboards
+
+grafana_admin_password_file: >-
+  {{ lookup('env', 'HOME') }}/.ssh/cloud-reliability/grafana_admin_password

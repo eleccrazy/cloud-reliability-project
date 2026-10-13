@@ -1,0 +1,20 @@
+---
+- name: Install common system packages
+  ansible.builtin.dnf:
+    name: "{{ common_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Configure system timezone
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+  become: true
+
+- name: Enable and start common services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ common_services }}"
+  become: true

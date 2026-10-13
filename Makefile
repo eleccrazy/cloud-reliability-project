@@ -4,7 +4,7 @@ PYTHON := .venv/bin/python
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap infra-plan infra-apply ssh-bootstrap ping destroy
+.PHONY: help bootstrap infra-plan infra-apply ssh-bootstrap ping configure configure-check destroy
 
 help: ## Show available commands and what they do
 	@printf 'Usage: make <command>\n\nCommands:\n'
@@ -26,6 +26,12 @@ ssh-bootstrap: ## Verify EC2 SSH host keys against AWS and save them to known_ho
 
 ping: ## Check SSH access and Python availability on all Ansible inventory hosts
 	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible all -m ansible.builtin.ping
+
+configure: ## Configure inventory hosts using the Ansible site playbook
+	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible-playbook playbooks/site.yml
+
+configure-check: ## Preview supported Ansible changes and show diffs using check mode
+	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible-playbook playbooks/site.yml --check --diff
 
 destroy: ## Destroy all resources managed by the dev Terraform configuration
 	cd $(TF_DIR) && terraform destroy

@@ -1,0 +1,15 @@
+---
+common_timezone: UTC
+
+common_packages:
+  - wget
+  - git
+  - jq
+  - tar
+  - unzip
+  - vim-enhanced
+  - bind-utils
+  - chrony
+
+common_services:
+  - chronyd

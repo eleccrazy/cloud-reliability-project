@@ -1,8 +1,20 @@
-.PHONY: help build test infra-plan infra-apply configure verify destroy
+TF_DIR := infrastructure/terraform/environments/dev
+ANSIBLE_DIR := ansible
+PYTHON := .venv/bin/python
 
-help:
-	@printf '%s\n' 'Planned targets: build test infra-plan infra-apply configure verify destroy' 'Components are not implemented yet.'
+.PHONY: infra-plan infra-apply ssh-bootstrap ping destroy
 
-build test infra-plan infra-apply configure verify destroy:
-	@printf '%s\n' "Target '$@' is not implemented yet." >&2
-	@exit 1
+infra-plan:
+	cd $(TF_DIR) && terraform plan
+
+infra-apply:
+	cd $(TF_DIR) && terraform apply
+
+ssh-bootstrap:
+	$(PYTHON) scripts/sync-ssh-hostkeys.py
+
+ping:
+	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible all -m ansible.builtin.ping
+
+destroy:
+	cd $(TF_DIR) && terraform destroy

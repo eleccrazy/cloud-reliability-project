@@ -1,0 +1,37 @@
+[Unit]
+Description=Cloud Reliability Go API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+User={{ application_user }}
+Group={{ application_group }}
+
+WorkingDirectory={{ application_working_directory }}
+Environment=PORT={{ application_port }}
+
+ExecStart={{ application_binary_destination }}
+
+Restart=on-failure
+RestartSec=5s
+
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ application_service_name }}
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

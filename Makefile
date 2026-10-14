@@ -4,7 +4,7 @@ PYTHON := .venv/bin/python
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap infra-plan infra-apply ssh-bootstrap ping configure configure-check destroy
+.PHONY: help bootstrap infra-plan infra-apply ssh-bootstrap ping app-build configure configure-check destroy
 
 help: ## Show available commands and what they do
 	@printf 'Usage: make <command>\n\nCommands:\n'
@@ -27,7 +27,13 @@ ssh-bootstrap: ## Verify EC2 SSH host keys against AWS and save them to known_ho
 ping: ## Check SSH access and Python availability on all Ansible inventory hosts
 	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible all -m ansible.builtin.ping
 
-configure: ## Configure inventory hosts using the Ansible site playbook
+app-build: ## Build the Go API binary for Linux amd64
+	cd app && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+		go build -trimpath -buildvcs=false \
+		-ldflags="-s -w" \
+		-o bin/cloud-reliability-api ./cmd/server
+
+configure: app-build ## Build the Go API and configure inventory hosts using the Ansible site playbook
 	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible-playbook playbooks/site.yml
 
 configure-check: ## Preview supported Ansible changes and show diffs using check mode

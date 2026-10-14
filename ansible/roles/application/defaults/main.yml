@@ -1,0 +1,10 @@
+---
+application_service_name: cloud-reliability-api
+application_user: cloudapi
+application_group: cloudapi
+
+application_binary_source: "{{ playbook_dir }}/../../app/bin/cloud-reliability-api"
+application_binary_destination: /usr/local/bin/cloud-reliability-api
+
+application_working_directory: /var/lib/cloud-reliability-api
+application_port: 8080

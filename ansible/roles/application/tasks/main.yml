@@ -1,0 +1,84 @@
+---
+- name: Verify local application binary exists
+  ansible.builtin.stat:
+    path: "{{ application_binary_source }}"
+  delegate_to: localhost
+  become: false
+  register: application_local_binary
+
+- name: Assert application binary is built
+  ansible.builtin.assert:
+    that:
+      - application_local_binary.stat.exists
+      - application_local_binary.stat.isreg
+    fail_msg: "Build the Go application before running Ansible."
+
+- name: Create application group
+  ansible.builtin.group:
+    name: "{{ application_group }}"
+    system: true
+
+- name: Create application user
+  ansible.builtin.user:
+    name: "{{ application_user }}"
+    group: "{{ application_group }}"
+    system: true
+    create_home: false
+    shell: /sbin/nologin
+
+- name: Create application working directory
+  ansible.builtin.file:
+    path: "{{ application_working_directory }}"
+    state: directory
+    owner: "{{ application_user }}"
+    group: "{{ application_group }}"
+    mode: "0750"
+
+- name: Deploy Go application binary
+  ansible.builtin.copy:
+    src: "{{ application_binary_source }}"
+    dest: "{{ application_binary_destination }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart application
+
+- name: Deploy application systemd unit
+  ansible.builtin.template:
+    src: cloud-reliability-api.service.j2
+    dest: "/etc/systemd/system/{{ application_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart application
+
+- name: Enable and start application
+  ansible.builtin.systemd_service:
+    name: "{{ application_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply pending application restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify application readiness
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ application_port }}/readyz"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: application_readiness
+  until:
+    - application_readiness.status == 200
+    - application_readiness.json.status | default('') == 'ready'
+  retries: 10
+  delay: 2
+  changed_when: false
+
+- name: Verify Prometheus metrics endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ application_port }}/metrics"
+    method: GET
+    status_code: 200
+  changed_when: false

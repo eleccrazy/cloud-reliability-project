@@ -7,6 +7,13 @@
     - common
     - node_exporter
 
+- name: Configure Go application
+  hosts: role_application
+  become: true
+  gather_facts: true
+  roles:
+    - application
+
 - name: Configure Alertmanager server
   hosts: role_prometheus
   become: true

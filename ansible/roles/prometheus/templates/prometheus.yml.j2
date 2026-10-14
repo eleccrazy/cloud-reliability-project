@@ -36,3 +36,15 @@ scrape_configs:
           environment: "dev"
 {% endfor %}
 {% endfor %}
+
+  - job_name: "go_api"
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+{% for host in groups['role_application'] %}
+          - "{{ hostvars[host]['private_ip_address'] }}:8080"
+{% endfor %}
+        labels:
+          environment: dev
+          service: cloud-reliability-api

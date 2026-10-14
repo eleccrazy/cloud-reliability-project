@@ -8,18 +8,25 @@ import (
 	"time"
 
 	"github.com/eleccrazy/cloud-reliability-project/app/internal/handlers"
+	"github.com/eleccrazy/cloud-reliability-project/app/internal/metrics"
+	"github.com/eleccrazy/cloud-reliability-project/app/internal/middleware"
 	"github.com/eleccrazy/cloud-reliability-project/app/internal/service"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
 	mux := http.NewServeMux()
+
+	registry := prometheus.NewRegistry()
+	httpMetrics := metrics.NewHTTPMetrics(registry)
 
 	itemService := service.NewItemService()
 	itemHandler := handlers.NewItemHandler(itemService)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 		})
@@ -27,14 +34,33 @@ func main() {
 
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",
 		})
 	})
 
-	mux.HandleFunc("GET /api/v1/items", itemHandler.List)
-	mux.HandleFunc("GET /api/v1/items/{id}", itemHandler.GetByID)
+	mux.Handle(
+		"GET /api/v1/items",
+		middleware.Instrument(
+			"/api/v1/items",
+			httpMetrics,
+			http.HandlerFunc(itemHandler.List),
+		),
+	)
+
+	mux.Handle(
+		"GET /api/v1/items/{id}",
+		middleware.Instrument(
+			"/api/v1/items/{id}",
+			httpMetrics,
+			http.HandlerFunc(itemHandler.GetByID),
+		),
+	)
+
+	mux.Handle(
+		"GET /metrics",
+		promhttp.HandlerFor(registry, promhttp.HandlerOpts{}),
+	)
 
 	port := os.Getenv("PORT")
 	if port == "" {

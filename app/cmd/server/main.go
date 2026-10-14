@@ -6,24 +6,35 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/eleccrazy/cloud-reliability-project/app/internal/handlers"
+	"github.com/eleccrazy/cloud-reliability-project/app/internal/service"
 )
 
 func main() {
 	mux := http.NewServeMux()
 
+	itemService := service.NewItemService()
+	itemHandler := handlers.NewItemHandler(itemService)
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 		})
 	})
 
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",
 		})
 	})
+
+	mux.HandleFunc("GET /api/v1/items", itemHandler.List)
+	mux.HandleFunc("GET /api/v1/items/{id}", itemHandler.GetByID)
 
 	port := os.Getenv("PORT")
 	if port == "" {

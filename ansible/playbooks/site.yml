@@ -1,18 +1,23 @@
 ---
-- name: Configure common baseline on all EC2 instances
+- name: Configure baseline and host monitoring
   hosts: aws_ec2
   become: true
   gather_facts: true
-
   roles:
     - common
     - node_exporter
+
+- name: Configure Alertmanager server
+  hosts: role_prometheus
+  become: true
+  gather_facts: true
+  roles:
+    - alertmanager
 
 - name: Configure Prometheus server
   hosts: role_prometheus
   become: true
   gather_facts: true
-
   roles:
     - prometheus
 
@@ -20,6 +25,5 @@
   hosts: role_grafana
   become: true
   gather_facts: true
-
   roles:
     - grafana

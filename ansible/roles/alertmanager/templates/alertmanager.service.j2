@@ -1,0 +1,27 @@
+[Unit]
+Description=Prometheus Alertmanager
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=alertmanager
+Group=alertmanager
+
+ExecStart=/usr/local/bin/alertmanager \
+  --config.file={{ alertmanager_config_dir }}/alertmanager.yml \
+  --storage.path={{ alertmanager_data_dir }} \
+  --web.listen-address={{ alertmanager_listen_address }} \
+  --cluster.listen-address=
+
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths={{ alertmanager_data_dir }}
+
+[Install]
+WantedBy=multi-user.target

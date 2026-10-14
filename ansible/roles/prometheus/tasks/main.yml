@@ -70,6 +70,24 @@
     - promtool
   notify: Restart Prometheus
 
+- name: Create Prometheus alert rules directory
+  ansible.builtin.file:
+    path: /etc/prometheus/alerts
+    state: directory
+    owner: root
+    group: prometheus
+    mode: "0755"
+
+- name: Install and validate infrastructure alert rules
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../observability/prometheus/alerts/infrastructure.yml"
+    dest: /etc/prometheus/alerts/infrastructure.yml
+    owner: root
+    group: prometheus
+    mode: "0644"
+    validate: "/usr/local/bin/promtool check rules %s"
+  notify: Restart Prometheus
+
 - name: Render and validate Prometheus configuration
   ansible.builtin.template:
     src: prometheus.yml.j2

@@ -1,0 +1,76 @@
+---
+groups:
+  - name: infrastructure
+    rules:
+      - alert: InstanceDown
+        expr: up{job="node_exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter unavailable on {{ $labels.node_role }}"
+          description: "Prometheus cannot scrape {{ $labels.instance }}."
+
+      - alert: HighCPUUsage
+        expr: |
+          100 * (
+            1 - avg by (instance, node_role, environment) (
+              rate(node_cpu_seconds_total{job="node_exporter",mode="idle"}[5m])
+            )
+          ) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.node_role }}"
+          description: "CPU utilization is above 85%."
+
+      - alert: HighMemoryUsage
+        expr: |
+          100 * (
+            node_memory_MemAvailable_bytes{job="node_exporter"}
+            /
+            node_memory_MemTotal_bytes{job="node_exporter"}
+          ) < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low available memory on {{ $labels.node_role }}"
+          description: "Available memory is below 15%."
+
+      - alert: LowDiskSpace
+        expr: |
+          (
+            1 -
+            node_filesystem_avail_bytes{
+              job="node_exporter",
+              mountpoint="/",
+              fstype!~"tmpfs|overlay"
+            }
+            /
+            node_filesystem_size_bytes{
+              job="node_exporter",
+              mountpoint="/",
+              fstype!~"tmpfs|overlay"
+            }
+          ) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low root filesystem space on {{ $labels.node_role }}"
+          description: "Root filesystem utilization is above 85%."
+
+      - alert: FilesystemReadOnly
+        expr: |
+          node_filesystem_readonly{
+            job="node_exporter",
+            mountpoint="/"
+          } == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Read-only root filesystem on {{ $labels.node_role }}"
+          description: "Root filesystem is mounted read-only."

@@ -44,23 +44,21 @@ func TestInstrumentRecordsStatusCodes(t *testing.T) {
 				t.Fatalf("expected %d, got %d", tt.status, rec.Code)
 			}
 
+			count := testutil.ToFloat64(
+				m.RequestsTotal.WithLabelValues(
+					http.MethodGet,
+					"/api/v1/items/{id}",
+					strconv.Itoa(tt.status),
+				),
+			)
 
-count := testutil.ToFloat64(
-	m.RequestsTotal.WithLabelValues(
-		http.MethodGet,
-		"/api/v1/items/{id}",
-		strconv.Itoa(tt.status),
-	),
-)
+			if count != 1 {
+				t.Errorf("expected request counter 1, got %v", count)
+			}
 
-if count != 1 {
-	t.Errorf("expected request counter 1, got %v", count)
-}
-
-if inFlight := testutil.ToFloat64(m.RequestsInFlight); inFlight != 0 {
-	t.Errorf("expected in-flight gauge 0, got %v", inFlight)
-}
-
+			if inFlight := testutil.ToFloat64(m.RequestsInFlight); inFlight != 0 {
+				t.Errorf("expected in-flight gauge 0, got %v", inFlight)
+			}
 
 		})
 	}

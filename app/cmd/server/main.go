@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"log"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/eleccrazy/cloud-reliability-project/app/internal/handlers"
@@ -17,7 +21,11 @@ import (
 )
 
 func main() {
-	mux := http.NewServeMux()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	slog.SetDefault(logger)
 
 	registry := prometheus.NewRegistry()
 	httpMetrics := metrics.NewHTTPMetrics(registry)
@@ -25,8 +33,11 @@ func main() {
 	itemService := service.NewItemService()
 	itemHandler := handlers.NewItemHandler(itemService)
 
+	mux := http.NewServeMux()
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 		})
@@ -34,26 +45,36 @@ func main() {
 
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",
 		})
 	})
 
+	// Instrument and log business endpoints.
 	mux.Handle(
 		"GET /api/v1/items",
-		middleware.Instrument(
+		middleware.RequestLogging(
 			"/api/v1/items",
-			httpMetrics,
-			http.HandlerFunc(itemHandler.List),
+			logger,
+			middleware.Instrument(
+				"/api/v1/items",
+				httpMetrics,
+				http.HandlerFunc(itemHandler.List),
+			),
 		),
 	)
 
 	mux.Handle(
 		"GET /api/v1/items/{id}",
-		middleware.Instrument(
+		middleware.RequestLogging(
 			"/api/v1/items/{id}",
-			httpMetrics,
-			http.HandlerFunc(itemHandler.GetByID),
+			logger,
+			middleware.Instrument(
+				"/api/v1/items/{id}",
+				httpMetrics,
+				http.HandlerFunc(itemHandler.GetByID),
+			),
 		),
 	)
 
@@ -76,9 +97,52 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("Starting API on port %s", port)
+	// The context is cancelled when SIGINT or SIGTERM is received.
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+	serverErrors := make(chan error, 1)
+
+	go func() {
+		logger.Info("server_starting", "port", port)
+
+		if err := server.ListenAndServe(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			serverErrors <- err
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		logger.Info("shutdown_signal_received")
+
+	case err := <-serverErrors:
+		logger.Error("server_failed", "error", err)
+		os.Exit(1)
 	}
+
+	// Restore default signal handling for a second signal.
+	stop()
+
+	shutdownCtx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+	defer cancel()
+
+	logger.Info("graceful_shutdown_started")
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("graceful_shutdown_failed", "error", err)
+
+		// Force remaining connections to close.
+		_ = server.Close()
+		os.Exit(1)
+	}
+
+	logger.Info("graceful_shutdown_completed")
 }

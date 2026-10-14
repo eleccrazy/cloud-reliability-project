@@ -5,9 +5,9 @@ import (
 )
 
 type HTTPMetrics struct {
-	RequestsTotal     *prometheus.CounterVec
-	RequestDuration   *prometheus.HistogramVec
-	RequestsInFlight  prometheus.Gauge
+	RequestsTotal    *prometheus.CounterVec
+	RequestDuration  *prometheus.HistogramVec
+	RequestsInFlight prometheus.Gauge
 }
 
 func NewHTTPMetrics(reg prometheus.Registerer) *HTTPMetrics {

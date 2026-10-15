@@ -21,10 +21,7 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
 	registry := prometheus.NewRegistry()
@@ -33,11 +30,11 @@ func main() {
 	itemService := service.NewItemService()
 	itemHandler := handlers.NewItemHandler(itemService)
 
+	// Main application router.
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 		})
@@ -45,13 +42,11 @@ func main() {
 
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",
 		})
 	})
 
-	// Instrument and log business endpoints.
 	mux.Handle(
 		"GET /api/v1/items",
 		middleware.RequestLogging(
@@ -83,13 +78,8 @@ func main() {
 		promhttp.HandlerFor(registry, promhttp.HandlerOpts{}),
 	)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	server := &http.Server{
-		Addr:              ":" + port,
+	apiServer := &http.Server{
+		Addr:              ":8080",
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
@@ -97,7 +87,40 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	// The context is cancelled when SIGINT or SIGTERM is received.
+	servers := []*http.Server{apiServer}
+
+	// Fault injection is disabled unless explicitly enabled.
+	if os.Getenv("ENABLE_FAULT_INJECTION") == "true" {
+		faultHandler := handlers.NewFaultHandler()
+		faultMux := http.NewServeMux()
+
+		registerFault := func(route string, handler http.HandlerFunc) {
+			faultMux.Handle(
+				"GET "+route,
+				middleware.RequestLogging(
+					route,
+					logger,
+					middleware.Instrument(route, httpMetrics, handler),
+				),
+			)
+		}
+
+		registerFault("/internal/faults/failure", faultHandler.Failure)
+		registerFault("/internal/faults/slow", faultHandler.Slow)
+
+		faultServer := &http.Server{
+			Addr:              "127.0.0.1:8081",
+			Handler:           faultMux,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      15 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+
+		servers = append(servers, faultServer)
+		logger.Info("fault_injection_enabled", "address", faultServer.Addr)
+	}
+
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -105,16 +128,20 @@ func main() {
 	)
 	defer stop()
 
-	serverErrors := make(chan error, 1)
+	serverErrors := make(chan error, len(servers))
 
-	go func() {
-		logger.Info("server_starting", "port", port)
+	for _, server := range servers {
+		srv := server
 
-		if err := server.ListenAndServe(); err != nil &&
-			!errors.Is(err, http.ErrServerClosed) {
-			serverErrors <- err
-		}
-	}()
+		go func() {
+			logger.Info("server_starting", "address", srv.Addr)
+
+			if err := srv.ListenAndServe(); err != nil &&
+				!errors.Is(err, http.ErrServerClosed) {
+				serverErrors <- err
+			}
+		}()
+	}
 
 	select {
 	case <-ctx.Done():
@@ -122,10 +149,15 @@ func main() {
 
 	case err := <-serverErrors:
 		logger.Error("server_failed", "error", err)
+		stop()
+
+		// Shut down every listener before returning failure.
+		for _, server := range servers {
+			_ = server.Close()
+		}
 		os.Exit(1)
 	}
 
-	// Restore default signal handling for a second signal.
 	stop()
 
 	shutdownCtx, cancel := context.WithTimeout(
@@ -136,11 +168,20 @@ func main() {
 
 	logger.Info("graceful_shutdown_started")
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("graceful_shutdown_failed", "error", err)
+	var shutdownFailed bool
 
-		// Force remaining connections to close.
-		_ = server.Close()
+	for _, server := range servers {
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("graceful_shutdown_failed",
+				"address", server.Addr,
+				"error", err,
+			)
+			_ = server.Close()
+			shutdownFailed = true
+		}
+	}
+
+	if shutdownFailed {
 		os.Exit(1)
 	}
 

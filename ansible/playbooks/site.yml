@@ -7,10 +7,15 @@
     - common
     - node_exporter
 
-- name: Configure Go application
+- name: Configure Go application and traffic generator
   hosts: role_application
   become: true
   gather_facts: true
+  vars:
+    application_enable_fault_injection: true
+    loadgen_enabled: true
+    loadgen_rps: 1
+    loadgen_timeout_seconds: 3
   roles:
     - application
 

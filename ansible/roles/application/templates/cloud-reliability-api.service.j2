@@ -11,6 +11,7 @@ Group={{ application_group }}
 
 WorkingDirectory={{ application_working_directory }}
 Environment=PORT={{ application_port }}
+Environment=ENABLE_FAULT_INJECTION={{ application_enable_fault_injection | bool | ternary('true', 'false') }}
 
 ExecStart={{ application_binary_destination }}
 

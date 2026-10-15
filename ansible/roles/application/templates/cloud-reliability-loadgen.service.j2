@@ -1,0 +1,41 @@
+[Unit]
+Description=Cloud Reliability Traffic Generator
+Wants=network-online.target
+After=network-online.target cloud-reliability-api.service
+Requires=cloud-reliability-api.service
+
+[Service]
+Type=simple
+
+User={{ application_user }}
+Group={{ application_group }}
+
+WorkingDirectory={{ application_working_directory }}
+
+Environment=LOADGEN_RPS={{ loadgen_rps }}
+Environment=LOADGEN_TIMEOUT_SECONDS={{ loadgen_timeout_seconds }}
+Environment=LOADGEN_API_URL={{ loadgen_api_url }}
+Environment=LOADGEN_FAULT_URL={{ loadgen_fault_url }}
+
+ExecStart={{ loadgen_binary_destination }}
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+KillSignal=SIGTERM
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ loadgen_service_name }}
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

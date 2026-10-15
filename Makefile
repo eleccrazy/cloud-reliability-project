@@ -32,6 +32,10 @@ app-build: ## Build the Go API binary for Linux amd64
 		go build -trimpath -buildvcs=false \
 		-ldflags="-s -w" \
 		-o bin/cloud-reliability-api ./cmd/server
+	cd app && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+		go build -trimpath -buildvcs=false \
+		-ldflags="-s -w" \
+		-o bin/cloud-reliability-loadgen ./cmd/loadgen
 
 configure: app-build ## Build the Go API and configure inventory hosts using the Ansible site playbook
 	cd $(ANSIBLE_DIR) && ../.venv/bin/ansible-playbook playbooks/site.yml

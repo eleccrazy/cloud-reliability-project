@@ -82,3 +82,59 @@
     method: GET
     status_code: 200
   changed_when: false
+
+
+- name: Verify local traffic generator binary exists
+  ansible.builtin.stat:
+    path: "{{ loadgen_binary_source }}"
+  delegate_to: localhost
+  become: false
+  register: loadgen_local_binary
+  when: loadgen_enabled | bool
+
+- name: Assert traffic generator binary is built
+  ansible.builtin.assert:
+    that:
+      - loadgen_local_binary.stat.exists
+      - loadgen_local_binary.stat.isreg
+    fail_msg: "Build the traffic generator with make app-build."
+  when: loadgen_enabled | bool
+
+- name: Deploy traffic generator binary
+  ansible.builtin.copy:
+    src: "{{ loadgen_binary_source }}"
+    dest: "{{ loadgen_binary_destination }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart traffic generator
+  when: loadgen_enabled | bool
+
+- name: Deploy traffic generator systemd unit
+  ansible.builtin.template:
+    src: cloud-reliability-loadgen.service.j2
+    dest: "/etc/systemd/system/{{ loadgen_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart traffic generator
+  when: loadgen_enabled | bool
+
+- name: Enable and start traffic generator
+  ansible.builtin.systemd_service:
+    name: "{{ loadgen_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: loadgen_enabled | bool
+
+- name: Apply pending traffic generator restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify traffic generator is running
+  ansible.builtin.command:
+    cmd: "systemctl is-active {{ loadgen_service_name }}"
+  register: loadgen_status
+  changed_when: false
+  failed_when: loadgen_status.stdout != "active"
+  when: loadgen_enabled | bool

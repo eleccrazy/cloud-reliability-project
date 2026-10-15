@@ -8,3 +8,18 @@ application_binary_destination: /usr/local/bin/cloud-reliability-api
 
 application_working_directory: /var/lib/cloud-reliability-api
 application_port: 8080
+
+# Fault injection: disabled unless explicitly enabled.
+application_enable_fault_injection: false
+
+# Traffic generator.
+loadgen_service_name: cloud-reliability-loadgen
+loadgen_binary_source: "{{ playbook_dir }}/../../app/bin/cloud-reliability-loadgen"
+loadgen_binary_destination: /usr/local/bin/cloud-reliability-loadgen
+
+loadgen_enabled: false
+loadgen_rps: 1
+loadgen_timeout_seconds: 3
+
+loadgen_api_url: http://127.0.0.1:8080
+loadgen_fault_url: http://127.0.0.1:8081
